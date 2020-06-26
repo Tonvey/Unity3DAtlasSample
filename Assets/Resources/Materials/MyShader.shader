@@ -40,7 +40,7 @@
             sampler2D _MainTex;
             int _TileID;
             float4 _MainTex_ST;
-            fixed4 _Rects[14];
+            float4 _Rects[14];
 
             v2f vert (appdata v)
             {
@@ -58,22 +58,36 @@
                 }
                 return o;
             }
-            fixed2 converToNewUV(fixed2 oldUV)
+            float2 converToNewUV(float2 oldUV , float4 rect)
             {
-                fixed4 rect = _Rects[_TileID];
                 oldUV = frac(oldUV);
-                return fixed2(oldUV.x*rect.z+rect.x,oldUV.y*rect.w+rect.y);
+                return float2(oldUV.x*rect.z+rect.x,oldUV.y*rect.w+rect.y);
             }
 
-            fixed4 frag (v2f i) : SV_Target
+            float4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                fixed2 newUV = converToNewUV(i.uv);
-                if(i.repeatWeight==0)
+                float4 rect = _Rects[_TileID];
+                float4 col; 
+                if(i.repeatWeight!=0)
                 {
-                    newUV = clamp(newUV,0.0,1.0);
+                    float2 newUV = clamp(i.uv,0.0,1.0);
+                    //col = tex2D(_MainTex, i.uv);
+                    col = float4(1.0,1.0,1.0,1.0);
                 }
-                fixed4 col = tex2D(_MainTex, newUV);
+                else
+                {
+                    //float2 newUV = converToNewUV(i.uv,rect);
+                    float2 newUV = frac(i.uv);
+                    newUV = float2(rect.z * newUV.x , rect.w * newUV.y);
+                    float2 dx = ddx(newUV);
+                    float2 dy = ddx(newUV);
+                    float extrudeUnit = 10.0 / 4176.0;
+                    newUV = float2(newUV.x + rect.x , newUV.y + rect.y);
+                    dx = clamp(rect.z * dx, -extrudeUnit, extrudeUnit);
+                    dy = clamp(rect.w * dy, -extrudeUnit, extrudeUnit);
+                    col = tex2D(_MainTex, newUV, dx, dy);
+                }
                 if(col.a<0.2)
                     discard;
                 // apply fog
